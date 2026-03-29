@@ -1,4 +1,5 @@
 import math
+import warnings
 import torch
 from torch import Tensor, nn
 from typing import Optional
@@ -55,7 +56,10 @@ class MultiHeadSelfAttention(nn.Module):
 
         if self.flash_attention:
             if not self._flash_warned and not torch.cuda.is_available():
-                print("Warning: flash_attention=True but CUDA is unavailable; using SDP math kernel.")
+                warnings.warn(
+                    "flash_attention=True but CUDA is unavailable; using the math SDP kernel instead.",
+                    stacklevel=2,
+                )
                 self._flash_warned = True
             attn_mask = None
             if mask is not None:
@@ -345,21 +349,15 @@ class TransformerEncoderLayer(nn.Module):
                 x    : Tensor, 
                 mask : Optional[Tensor] = None):
         """
-        Docstring for forward
-        
-        :param self: Description
-        :param x: Description
+        Apply attention and feed-forward residual blocks in sequence.
+
+        `normFirst` is handled inside each `ResidualBlock`, so the encoder
+        layer itself does not need separate pre-norm and post-norm branches.
         """
 
-        if self.normFirst:
-            x = self.residue1(x,mask=mask) # Attenstion will be done inside the residual block
-            
-            x = self.residue2(x)
-        else:
-            x = self.residue1(x,mask=mask)
+        x = self.residue1(x, mask=mask)
+        x = self.residue2(x)
 
-            x = self.residue2(x)
-        
         return x
     
 class TransformerDecoderLayer(nn.Module):

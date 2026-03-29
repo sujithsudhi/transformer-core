@@ -9,9 +9,20 @@ description = "Reusable transformer building blocks"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["torch>=2.2"]
+authors = [{name = "Sujith"}]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6.0"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
