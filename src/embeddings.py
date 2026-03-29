@@ -80,7 +80,9 @@ class PositionalEncoding(nn.Module):
         length = x.size(1)
 
         if offset + length > self.max_len:
-            raise ValueError(f"offset({offset}) + length({length}) > max_len({self.max_len}). Increase max_len.")
+            raise ValueError(
+                f"offset({offset}) + length({length}) > max_len({self.max_len}). Increase max_len."
+            )
 
         x = x + self.positional_table[:, offset : offset + length]
 

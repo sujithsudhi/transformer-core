@@ -16,9 +16,7 @@ dev = ["pytest>=8.0", "ruff>=0.6.0"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
+py-modules = ["transformer_core", "embeddings", "layers"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

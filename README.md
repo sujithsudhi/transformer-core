@@ -16,10 +16,9 @@ transformer-core/
   pyproject.toml
   README.md
   src/
-    transformer_core/
-      __init__.py
-      embeddings.py
-      layers.py
+    transformer_core.py
+    embeddings.py
+    layers.py
   tests/
 ```
 
