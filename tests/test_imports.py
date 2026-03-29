@@ -1,11 +1,13 @@
 from transformer_core import (
     FeedForward,
     MultiHeadSelfAttention,
+    PatchEmbedding,
     PositionalEncoding,
     ResidualBlock,
     TokenEmbedding,
     TransformerDecoderLayer,
     TransformerEncoderLayer,
+    ViTEncoderLayer,
 )
 
 
@@ -17,3 +19,5 @@ def test_public_api_exports() -> None:
     assert ResidualBlock is not None
     assert TransformerEncoderLayer is not None
     assert TransformerDecoderLayer is not None
+    assert PatchEmbedding is not None
+    assert ViTEncoderLayer is not None

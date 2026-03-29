@@ -4,7 +4,7 @@ from transformer_core import MultiHeadSelfAttention, TransformerDecoderLayer, Tr
 
 
 def test_multi_head_attention_accepts_padding_mask() -> None:
-    attention = MultiHeadSelfAttention(embedDim=8, numHeads=2)
+    attention = MultiHeadSelfAttention(embed_dim=8, num_heads=2)
     x = torch.randn(2, 4, 8)
     mask = torch.tensor([[1, 1, 1, 0], [1, 1, 0, 0]], dtype=torch.bool)
 
@@ -14,7 +14,7 @@ def test_multi_head_attention_accepts_padding_mask() -> None:
 
 
 def test_encoder_layer_forward_shape() -> None:
-    layer = TransformerEncoderLayer(embedDim=8, numHeads=2)
+    layer = TransformerEncoderLayer(embed_dim=8, num_heads=2)
     x = torch.randn(2, 4, 8)
 
     output = layer(x)
@@ -23,7 +23,7 @@ def test_encoder_layer_forward_shape() -> None:
 
 
 def test_decoder_layer_cache_growth() -> None:
-    layer = TransformerDecoderLayer(embedDim=8, numHeads=2)
+    layer = TransformerDecoderLayer(embed_dim=8, num_heads=2)
     x = torch.randn(2, 3, 8)
 
     output, cache = layer(x, use_cache=True)
