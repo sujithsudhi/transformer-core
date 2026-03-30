@@ -2,10 +2,11 @@
 
 from .attention import MultiHeadSelfAttention
 from .feedforward import FeedForward
-from .residual import ResidualBlock
+from .residual import DropPath, ResidualBlock
 
 __all__ = [
     "MultiHeadSelfAttention",
     "FeedForward",
+    "DropPath",
     "ResidualBlock",
 ]
