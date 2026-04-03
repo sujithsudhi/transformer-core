@@ -56,9 +56,6 @@ def _resolve_block_config(config=None, **kwargs) -> dict:
             "attention_type": getattr(config, "attention_type", None),
             "window_size": getattr(config, "window_size", None),
         }
-        for key, value in kwargs.items():
-            if value is not None:
-                resolved[key] = value
         return resolved
 
     embed_dim = kwargs["embed_dim"]
@@ -123,9 +120,16 @@ class _TransformerLayerBase(nn.Module):
                        mask      : Optional[Tensor] = None,
                        past_kv   : Optional[tuple[Tensor, Tensor]] = None,
                        use_cache : bool = False,
+                       is_causal : bool = False,
                       ) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
         
-        out = self.residual_attention(x, mask=mask, past_kv=past_kv, use_cache=use_cache)
+        out = self.residual_attention(
+            x,
+            mask=mask,
+            past_kv=past_kv,
+            use_cache=use_cache,
+            is_causal=is_causal,
+        )
         
         if isinstance(out, tuple):
             x, present = out
@@ -223,7 +227,7 @@ class TransformerDecoderLayer(_TransformerLayerBase):
         )
         super().__init__(resolved)
 
-    def _build_causal_mask(self, x: Tensor, mask: Optional[Tensor], past_len: int = 0) -> Tensor:
+    def _build_causal_mask(self, x: Tensor, mask: Tensor, past_len: int = 0) -> Tensor:
         batch_size, seq_len, _ = x.shape
         total_len = past_len + seq_len
         causal = torch.tril(torch.ones(total_len, total_len, device=x.device, dtype=torch.bool))
@@ -231,8 +235,6 @@ class TransformerDecoderLayer(_TransformerLayerBase):
             causal = causal[total_len - seq_len : total_len, :]
         causal = causal.unsqueeze(0).expand(batch_size, seq_len, total_len)
 
-        if mask is None:
-            return causal
         if mask.dtype != torch.bool:
             mask = mask > 0
         if mask.dim() == 2:
@@ -253,6 +255,16 @@ class TransformerDecoderLayer(_TransformerLayerBase):
     ) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
         past_len = 0 if past_kv is None else past_kv[0].size(2)
         attn_mask = None
+        is_causal = False
         if not (use_cache and past_kv is not None and x.size(1) == 1):
-            attn_mask = self._build_causal_mask(x, mask, past_len=past_len)
-        return self._forward_block(x, mask=attn_mask, past_kv=past_kv, use_cache=use_cache)
+            if mask is None:
+                is_causal = True
+            else:
+                attn_mask = self._build_causal_mask(x, mask, past_len=past_len)
+        return self._forward_block(
+            x,
+            mask=attn_mask,
+            past_kv=past_kv,
+            use_cache=use_cache,
+            is_causal=is_causal,
+        )
