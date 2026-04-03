@@ -31,7 +31,7 @@ class RotaryEmbedding(nn.Module):
         sin = sin.unsqueeze(0).unsqueeze(0).to(dtype=dtype)
         return cos, sin
 
-    def _apply(self, x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:
+    def _apply_rotary(self, x: Tensor, cos: Tensor, sin: Tensor) -> Tensor:
         return (x * cos) + (self._rotate_half(x) * sin)
 
     def forward(self,
@@ -46,4 +46,4 @@ class RotaryEmbedding(nn.Module):
                                        device=q.device,
                                        dtype=q.dtype,
                                        position_offset=position_offset)
-        return self._apply(q, cos, sin), self._apply(k, cos, sin)
+        return self._apply_rotary(q, cos, sin), self._apply_rotary(k, cos, sin)
