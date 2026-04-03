@@ -21,7 +21,11 @@ from .multimodal import (
     MultimodalLayout,
     PatchGrid,
     build_vlm_layout,
+    explain_vlm_attention,
+    explain_vlm_with_gradients,
     infer_patch_grid,
+    reshape_patch_scores,
+    select_modality_scores,
 )
 from .results import AttributionResult, AttentionTraceResult, VLMExplanationResult
 
@@ -35,10 +39,14 @@ __all__ = [
     "attention_entropy",
     "attention_sparsity",
     "build_vlm_layout",
+    "explain_vlm_attention",
+    "explain_vlm_with_gradients",
     "explain_attention",
     "extract_attention_weights",
     "infer_patch_grid",
     "rollout_attention",
+    "reshape_patch_scores",
+    "select_modality_scores",
     "explain_with_gradients",
     "gradient_x_input",
     "integrated_gradients",
