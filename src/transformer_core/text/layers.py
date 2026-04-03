@@ -56,6 +56,9 @@ def _resolve_block_config(config=None, **kwargs) -> dict:
             "attention_type": getattr(config, "attention_type", None),
             "window_size": getattr(config, "window_size", None),
         }
+        for key, value in kwargs.items():
+            if value is not None:
+                resolved[key] = value
         return resolved
 
     embed_dim = kwargs["embed_dim"]
@@ -87,61 +90,50 @@ class _TransformerLayerBase(nn.Module):
     def __init__(self, resolved: dict) -> None:
         super().__init__()
         self.attention_type = resolved["attention_type"]
-        self.window_size = resolved["window_size"]
+        self.window_size    = resolved["window_size"]
 
-        self.residual_attention = ResidualBlock(
-            embed_dim=resolved["embed_dim"],
-            module=MultiHeadSelfAttention(
-                embed_dim=resolved["embed_dim"],
-                num_heads=resolved["num_heads"],
-                dropout=resolved["attention_dropout"],
-                flash_attention=resolved["flash_attention"],
-                qkv_bias=resolved["qkv_bias"],
-                use_rope=resolved["use_rope"],
-                rope_base=resolved["rope_base"],
-            ),
-            dropout=resolved["dropout"],
-            norm_first=resolved["norm_first"],
-            layer_norm_eps=resolved["layer_norm_eps"],
-            drop_path=resolved["drop_path"],
+        self.residual_attention = ResidualBlock(embed_dim=resolved["embed_dim"],
+                        module=MultiHeadSelfAttention(embed_dim=resolved["embed_dim"],
+                                                    num_heads=resolved["num_heads"],
+                                                    dropout=resolved["attention_dropout"],
+                                                    flash_attention=resolved["flash_attention"],
+                                                    qkv_bias=resolved["qkv_bias"],
+                                                    use_rope=resolved["use_rope"],
+                                                    rope_base=resolved["rope_base"]),
+                        dropout=resolved["dropout"],
+                        norm_first=resolved["norm_first"],
+                        layer_norm_eps=resolved["layer_norm_eps"],
+                        drop_path=resolved["drop_path"],
+                    )
+
+        self.residual_mlp = ResidualBlock(embed_dim=resolved["embed_dim"],
+                    module=FeedForward(input_dim=resolved["embed_dim"],
+                                    hidden_dim=resolved["mlp_hidden_dim"],
+                                    output_dim=resolved["embed_dim"],
+                                    activation=_build_activation(resolved["activation"]),
+                                    dropout=resolved["dropout"]),
+                    dropout=resolved["dropout"],
+                    norm_first=resolved["norm_first"],
+                    layer_norm_eps=resolved["layer_norm_eps"],
+                    drop_path=resolved["drop_path"],
         )
 
-        self.residual_mlp = ResidualBlock(
-            embed_dim=resolved["embed_dim"],
-            module=FeedForward(
-                input_dim=resolved["embed_dim"],
-                hidden_dim=resolved["mlp_hidden_dim"],
-                output_dim=resolved["embed_dim"],
-                activation=_build_activation(resolved["activation"]),
-                dropout=resolved["dropout"],
-            ),
-            dropout=resolved["dropout"],
-            norm_first=resolved["norm_first"],
-            layer_norm_eps=resolved["layer_norm_eps"],
-            drop_path=resolved["drop_path"],
-        )
-
-    def _forward_block(
-        self,
-        x: Tensor,
-        mask: Optional[Tensor] = None,
-        past_kv: Optional[tuple[Tensor, Tensor]] = None,
-        use_cache: bool = False,
-        is_causal: bool = False,
-    ) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
-        out = self.residual_attention(
-            x,
-            mask=mask,
-            past_kv=past_kv,
-            use_cache=use_cache,
-            is_causal=is_causal,
-        )
+    def _forward_block(self,
+                       x         : Tensor,
+                       mask      : Optional[Tensor] = None,
+                       past_kv   : Optional[tuple[Tensor, Tensor]] = None,
+                       use_cache : bool = False,
+                      ) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
+        
+        out = self.residual_attention(x, mask=mask, past_kv=past_kv, use_cache=use_cache)
+        
         if isinstance(out, tuple):
             x, present = out
         else:
             x = out
             present = None
         x = self.residual_mlp(x)
+        
         if use_cache:
             return x, present
         return x
@@ -166,6 +158,7 @@ class TransformerEncoderLayer(_TransformerLayerBase):
                  layer_norm_eps    : float = 1e-5,
                  drop_path         : float = 0.0,
                  config = None) -> None:
+        
         resolved = _resolve_block_config(
             config=config,
             embed_dim=embed_dim,
@@ -210,6 +203,7 @@ class TransformerDecoderLayer(_TransformerLayerBase):
                  config = None,
                  *args,
                  **kwargs) -> None:
+        
         resolved = _resolve_block_config(
             config=config,
             embed_dim=embed_dim,
@@ -229,7 +223,7 @@ class TransformerDecoderLayer(_TransformerLayerBase):
         )
         super().__init__(resolved)
 
-    def _build_causal_mask(self, x: Tensor, mask: Tensor, past_len: int = 0) -> Tensor:
+    def _build_causal_mask(self, x: Tensor, mask: Optional[Tensor], past_len: int = 0) -> Tensor:
         batch_size, seq_len, _ = x.shape
         total_len = past_len + seq_len
         causal = torch.tril(torch.ones(total_len, total_len, device=x.device, dtype=torch.bool))
@@ -237,6 +231,8 @@ class TransformerDecoderLayer(_TransformerLayerBase):
             causal = causal[total_len - seq_len : total_len, :]
         causal = causal.unsqueeze(0).expand(batch_size, seq_len, total_len)
 
+        if mask is None:
+            return causal
         if mask.dtype != torch.bool:
             mask = mask > 0
         if mask.dim() == 2:
@@ -257,16 +253,6 @@ class TransformerDecoderLayer(_TransformerLayerBase):
     ) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
         past_len = 0 if past_kv is None else past_kv[0].size(2)
         attn_mask = None
-        is_causal = False
         if not (use_cache and past_kv is not None and x.size(1) == 1):
-            if mask is None:
-                is_causal = True
-            else:
-                attn_mask = self._build_causal_mask(x, mask, past_len=past_len)
-        return self._forward_block(
-            x,
-            mask=attn_mask,
-            past_kv=past_kv,
-            use_cache=use_cache,
-            is_causal=is_causal,
-        )
+            attn_mask = self._build_causal_mask(x, mask, past_len=past_len)
+        return self._forward_block(x, mask=attn_mask, past_kv=past_kv, use_cache=use_cache)

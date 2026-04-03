@@ -42,8 +42,7 @@ class MultiHeadSelfAttention(nn.Module):
                            q    : Tensor,
                            k    : Tensor,
                            v    : Tensor,
-                           mask : Optional[Tensor] = None,
-                           is_causal: bool = False) -> Tensor:
+                           mask : Optional[Tensor] = None) -> Tensor:
         if self.flash_attention:
             if not self._flash_warned and not torch.cuda.is_available():
                 warnings.warn("flash_attention=True but CUDA is unavailable; using the math SDP kernel instead.",
@@ -59,15 +58,10 @@ class MultiHeadSelfAttention(nn.Module):
                                                   v,
                                                   attn_mask=attn_mask,
                                                   dropout_p=dropout_p,
-                                                  is_causal=is_causal)
+                                                  is_causal=False)
 
         dk = q.size(-1)
         attention = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(dk)
-        if is_causal:
-            q_len = attention.size(-2)
-            k_len = attention.size(-1)
-            causal = torch.tril(torch.ones(q_len, k_len, device=attention.device, dtype=torch.bool))
-            attention = attention.masked_fill(~causal, float("-inf"))
         if mask is not None:
             mask = mask.to(dtype=torch.bool, device=attention.device)
             attention = attention.masked_fill(~mask, float("-inf"))
@@ -79,7 +73,7 @@ class MultiHeadSelfAttention(nn.Module):
     def split_heads(self, x: Tensor) -> Tensor:
         batch_size, seq_len, _ = x.shape
         return (x.view(batch_size, seq_len, self.num_heads, self.head_dim)
-                .transpose(1, 2)
+                .transpose(1, 2) 
                 .contiguous()
                 .view(batch_size, self.num_heads, seq_len, self.head_dim)
             )
@@ -95,8 +89,7 @@ class MultiHeadSelfAttention(nn.Module):
                 x         : Tensor,
                 mask      : Optional[Tensor] = None,
                 past_kv   : Optional[tuple[Tensor, Tensor]] = None,
-                use_cache : bool = False,
-                is_causal : bool = False) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
+                use_cache : bool = False) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
         
         q = self.split_heads(self.w_q(x))
         k = self.split_heads(self.w_k(x))
@@ -128,7 +121,7 @@ class MultiHeadSelfAttention(nn.Module):
                 raise ValueError("Unsupported attention mask rank.")
             attn_mask = mask.to(q.device)
 
-        attention = self.scaled_dot_product(q=q, k=k, v=v, mask=attn_mask, is_causal=is_causal)
+        attention = self.scaled_dot_product(q=q, k=k, v=v, mask=attn_mask)
         attention = self.combine_heads(attention)
         attention = self.dropout(attention)
         attention = self.w_o(attention)
