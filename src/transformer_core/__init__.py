@@ -3,6 +3,7 @@
 from .common import DropPath, FeedForward, MultiHeadSelfAttention, ResidualBlock
 from .text import PositionalEncoding, TokenEmbedding, TransformerDecoderLayer, TransformerEncoderLayer
 from .vision import PatchEmbedding, ViTEncoderLayer
+from . import xai
 
 __all__ = [
     "PositionalEncoding",
@@ -15,4 +16,5 @@ __all__ = [
     "TransformerDecoderLayer",
     "PatchEmbedding",
     "ViTEncoderLayer",
+    "xai",
 ]
