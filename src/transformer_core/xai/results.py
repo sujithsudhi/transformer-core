@@ -87,3 +87,38 @@ class VLMExplanationResult:
         if self.attention_rollout is not None:
             payload["attention_rollout"] = self.attention_rollout
         return payload
+
+
+@dataclass
+class FaithfulnessResult:
+    """Perturbation-based faithfulness metrics for a selected set of positions."""
+
+    selected_positions: list[int]
+    comprehensiveness: Tensor
+    sufficiency: Tensor
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "selected_positions": list(self.selected_positions),
+            "comprehensiveness": self.comprehensiveness,
+            "sufficiency": self.sufficiency,
+            "metadata": dict(self.metadata),
+        }
+
+
+@dataclass
+class VLMFaithfulnessResult:
+    """Faithfulness breakdown for overall, text-only, and image-only selections."""
+
+    overall: FaithfulnessResult
+    text: Optional[FaithfulnessResult] = None
+    image: Optional[FaithfulnessResult] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = {"overall": self.overall.to_dict()}
+        if self.text is not None:
+            payload["text"] = self.text.to_dict()
+        if self.image is not None:
+            payload["image"] = self.image.to_dict()
+        return payload
