@@ -7,6 +7,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+import torch
+from torch import Tensor
+
+from transformer_core.xai.attention import explain_attention
+from transformer_core.xai.gradients import explain_with_gradients
+from transformer_core.xai.results import VLMExplanationResult
 from transformer_core.vision.patch_embedding import PatchEmbedding
 
 
@@ -142,3 +148,118 @@ def build_vlm_layout(
         spans.append(ModalitySpan("special", cursor, cursor + suffix_special_tokens, label="suffix"))
 
     return MultimodalLayout(spans=tuple(spans))
+
+
+def select_modality_scores(scores: Tensor, layout: MultimodalLayout, modality: str) -> Tensor:
+    """Select the scores that belong to a specific modality."""
+
+    positions = layout.positions(modality)
+    if not positions:
+        shape = scores.shape[:-1] + (0,) if scores.dim() > 0 else (0,)
+        return scores.new_empty(shape)
+
+    indices = torch.as_tensor(positions, dtype=torch.long, device=scores.device)
+    if scores.dim() == 1:
+        return scores.index_select(0, indices)
+    return scores.index_select(-1, indices)
+
+
+def reshape_patch_scores(patch_scores: Tensor, patch_grid: PatchGrid) -> Tensor:
+    """Project flat patch scores back onto the 2D patch grid."""
+
+    if patch_scores.shape[-1] != patch_grid.num_patches:
+        raise ValueError(
+            f"Expected {patch_grid.num_patches} patch scores, got {patch_scores.shape[-1]}"
+        )
+
+    if patch_scores.dim() == 1:
+        return patch_scores.view(patch_grid.grid_height, patch_grid.grid_width)
+    if patch_scores.dim() == 2:
+        return patch_scores.view(patch_scores.shape[0], patch_grid.grid_height, patch_grid.grid_width)
+    raise ValueError("patch_scores must be a 1D or 2D tensor.")
+
+
+def explain_vlm_with_gradients(
+    model: torch.nn.Module,
+    inputs: Tensor,
+    *,
+    layout: MultimodalLayout,
+    patch_grid: PatchGrid,
+    method: str = "integrated_gradients",
+    target: Optional[Tensor] = None,
+    **kwargs,
+) -> VLMExplanationResult:
+    """
+    Run an existing gradient explainer and split the resulting scores by modality.
+    """
+    gradient_result = explain_with_gradients(
+        model=model,
+        inputs=inputs,
+        method=method,
+        target=target,
+        **kwargs,
+    )
+    token_scores = gradient_result["token_importance"]
+    text_scores = select_modality_scores(token_scores, layout, "text_token")
+    image_scores = select_modality_scores(token_scores, layout, "image_patch")
+    image_grid_scores = reshape_patch_scores(image_scores, patch_grid) if image_scores.numel() else None
+
+    metadata = {
+        "method": method,
+        "raw_result": gradient_result,
+    }
+    return VLMExplanationResult(
+        layout=layout,
+        text_token_scores=text_scores,
+        image_patch_scores=image_scores,
+        image_patch_grid_scores=image_grid_scores,
+        metadata=metadata,
+    )
+
+
+def explain_vlm_attention(
+    model: torch.nn.Module,
+    inputs: Tensor,
+    *,
+    layout: MultimodalLayout,
+    patch_grid: PatchGrid,
+    target_positions: Optional[list[int]] = None,
+    layer_idx: Optional[int] = None,
+    head_idx: Optional[int] = None,
+    mask: Optional[Tensor] = None,
+    use_rollout: bool = True,
+) -> VLMExplanationResult:
+    """
+    Run attention-based explanation and split the resulting rollout scores by modality.
+    """
+    if target_positions is None:
+        target_positions = layout.positions("text_token")
+
+    attention_result = explain_attention(
+        model=model,
+        inputs=inputs,
+        target_tokens=target_positions,
+        layer_idx=layer_idx,
+        head_idx=head_idx,
+        mask=mask,
+        use_rollout=use_rollout,
+    )
+
+    token_scores = attention_result.get("token_importance")
+    text_scores = None if token_scores is None else select_modality_scores(token_scores, layout, "text_token")
+    image_scores = None if token_scores is None else select_modality_scores(token_scores, layout, "image_patch")
+    image_grid_scores = None
+    if image_scores is not None and image_scores.numel():
+        image_grid_scores = reshape_patch_scores(image_scores, patch_grid)
+
+    return VLMExplanationResult(
+        layout=layout,
+        text_token_scores=text_scores,
+        image_patch_scores=image_scores,
+        image_patch_grid_scores=image_grid_scores,
+        attention_rollout=attention_result.get("rollout_attention"),
+        metadata={
+            "attention_result": attention_result,
+            "target_positions": target_positions,
+        },
+    )

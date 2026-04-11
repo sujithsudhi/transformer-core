@@ -69,6 +69,7 @@ class VLMExplanationResult:
     layout: Any
     text_token_scores: Optional[Tensor] = None
     image_patch_scores: Optional[Tensor] = None
+    image_patch_grid_scores: Optional[Tensor] = None
     attention_rollout: Optional[Tensor] = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -81,6 +82,8 @@ class VLMExplanationResult:
             payload["text_token_scores"] = self.text_token_scores
         if self.image_patch_scores is not None:
             payload["image_patch_scores"] = self.image_patch_scores
+        if self.image_patch_grid_scores is not None:
+            payload["image_patch_grid_scores"] = self.image_patch_grid_scores
         if self.attention_rollout is not None:
             payload["attention_rollout"] = self.attention_rollout
         return payload
