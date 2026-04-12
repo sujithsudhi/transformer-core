@@ -58,29 +58,30 @@ def _resolve_block_config(config=None, **kwargs) -> dict:
         }
         return resolved
 
-    embed_dim = kwargs["embed_dim"]
-    num_heads = kwargs["num_heads"]
-    mlp_ratio = kwargs.get("mlp_ratio", 4.0)
+    embed_dim  = kwargs["embed_dim"]
+    num_heads  = kwargs["num_heads"]
+    mlp_ratio  = kwargs.get("mlp_ratio", 4.0)
     hidden_dim = kwargs.get("mlp_hidden_dim")
+    
     if hidden_dim is None:
         hidden_dim = int(embed_dim * mlp_ratio)
-    return {
-        "embed_dim": embed_dim,
-        "num_heads": num_heads,
-        "mlp_hidden_dim": hidden_dim,
-        "activation": kwargs.get("activation"),
-        "attention_dropout": kwargs.get("attention_dropout", 0.0),
-        "dropout": kwargs.get("dropout", 0.0),
-        "norm_first": kwargs.get("norm_first", True),
-        "flash_attention": kwargs.get("flash_attention", False),
-        "qkv_bias": kwargs.get("qkv_bias", True),
-        "use_rope": kwargs.get("use_rope", False),
-        "rope_base": kwargs.get("rope_base", 10000),
-        "layer_norm_eps": kwargs.get("layer_norm_eps", 1e-5),
-        "drop_path": kwargs.get("drop_path", 0.0),
-        "attention_type": kwargs.get("attention_type"),
-        "window_size": kwargs.get("window_size"),
-    }
+
+    return {"embed_dim"        : embed_dim,
+            "num_heads"        : num_heads,
+            "mlp_hidden_dim"   : hidden_dim,
+            "activation"       : kwargs.get("activation"),
+            "attention_dropout": kwargs.get("attention_dropout", 0.0),
+            "dropout"          : kwargs.get("dropout", 0.0),
+            "norm_first"       : kwargs.get("norm_first", True),
+            "flash_attention"  : kwargs.get("flash_attention", False),
+            "qkv_bias"         : kwargs.get("qkv_bias", True),
+            "use_rope"         : kwargs.get("use_rope", False),
+            "rope_base"        : kwargs.get("rope_base", 10000),
+            "layer_norm_eps"   : kwargs.get("layer_norm_eps", 1e-5),
+            "drop_path"        : kwargs.get("drop_path", 0.0),
+            "attention_type"   : kwargs.get("attention_type"),
+            "window_size"      : kwargs.get("window_size"),
+        }
 
 
 class _TransformerLayerBase(nn.Module):
@@ -91,12 +92,12 @@ class _TransformerLayerBase(nn.Module):
 
         self.residual_attention = ResidualBlock(embed_dim=resolved["embed_dim"],
                         module=MultiHeadSelfAttention(embed_dim=resolved["embed_dim"],
-                                                    num_heads=resolved["num_heads"],
-                                                    dropout=resolved["attention_dropout"],
-                                                    flash_attention=resolved["flash_attention"],
-                                                    qkv_bias=resolved["qkv_bias"],
-                                                    use_rope=resolved["use_rope"],
-                                                    rope_base=resolved["rope_base"]),
+                                                      num_heads=resolved["num_heads"],
+                                                      dropout=resolved["attention_dropout"],
+                                                      flash_attention=resolved["flash_attention"],
+                                                      qkv_bias=resolved["qkv_bias"],
+                                                      use_rope=resolved["use_rope"],
+                                                      rope_base=resolved["rope_base"]),
                         dropout=resolved["dropout"],
                         norm_first=resolved["norm_first"],
                         layer_norm_eps=resolved["layer_norm_eps"],
@@ -105,10 +106,10 @@ class _TransformerLayerBase(nn.Module):
 
         self.residual_mlp = ResidualBlock(embed_dim=resolved["embed_dim"],
                     module=FeedForward(input_dim=resolved["embed_dim"],
-                                    hidden_dim=resolved["mlp_hidden_dim"],
-                                    output_dim=resolved["embed_dim"],
-                                    activation=_build_activation(resolved["activation"]),
-                                    dropout=resolved["dropout"]),
+                                       hidden_dim=resolved["mlp_hidden_dim"],
+                                       output_dim=resolved["embed_dim"],
+                                       activation=_build_activation(resolved["activation"]),
+                                       dropout=resolved["dropout"]),
                     dropout=resolved["dropout"],
                     norm_first=resolved["norm_first"],
                     layer_norm_eps=resolved["layer_norm_eps"],
@@ -123,13 +124,11 @@ class _TransformerLayerBase(nn.Module):
                        is_causal : bool = False,
                       ) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
         
-        out = self.residual_attention(
-            x,
-            mask=mask,
-            past_kv=past_kv,
-            use_cache=use_cache,
-            is_causal=is_causal,
-        )
+        out = self.residual_attention(x,
+                                      mask      = mask,
+                                      past_kv   = past_kv,
+                                      use_cache = use_cache,
+                                      is_causal = is_causal)
         
         if isinstance(out, tuple):
             x, present = out
@@ -163,23 +162,21 @@ class TransformerEncoderLayer(_TransformerLayerBase):
                  drop_path         : float = 0.0,
                  config = None) -> None:
         
-        resolved = _resolve_block_config(
-            config=config,
-            embed_dim=embed_dim,
-            num_heads=num_heads,
-            mlp_ratio=mlp_ratio,
-            activation=activation,
-            attention_dropout=attention_dropout,
-            dropout=dropout,
-            norm_first=norm_first,
-            flash_attention=flash_attention,
-            qkv_bias=qkv_bias,
-            use_rope=use_rope,
-            rope_base=rope_base,
-            mlp_hidden_dim=mlp_hidden_dim,
-            layer_norm_eps=layer_norm_eps,
-            drop_path=drop_path,
-        )
+        resolved = _resolve_block_config(config            = config,
+                                         embed_dim         = embed_dim,
+                                         num_heads         = num_heads,
+                                         mlp_ratio         = mlp_ratio,
+                                         activation        = activation,
+                                         attention_dropout = attention_dropout,
+                                         dropout           = dropout,
+                                         norm_first        = norm_first,
+                                         flash_attention   = flash_attention,
+                                         qkv_bias          = qkv_bias,
+                                         use_rope          = use_rope,
+                                         rope_base         = rope_base,
+                                         mlp_hidden_dim    = mlp_hidden_dim,
+                                         layer_norm_eps    = layer_norm_eps,
+                                         drop_path         = drop_path)
         super().__init__(resolved)
 
     def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
@@ -208,51 +205,55 @@ class TransformerDecoderLayer(_TransformerLayerBase):
                  *args,
                  **kwargs) -> None:
         
-        resolved = _resolve_block_config(
-            config=config,
-            embed_dim=embed_dim,
-            num_heads=num_heads,
-            mlp_ratio=mlp_ratio,
-            activation=activation,
-            attention_dropout=attention_dropout,
-            dropout=dropout,
-            norm_first=norm_first,
-            flash_attention=flash_attention,
-            qkv_bias=qkv_bias,
-            use_rope=use_rope,
-            rope_base=rope_base,
-            mlp_hidden_dim=mlp_hidden_dim,
-            layer_norm_eps=layer_norm_eps,
-            drop_path=drop_path,
-        )
+        resolved = _resolve_block_config(config            = config,
+                                         embed_dim         = embed_dim,
+                                         num_heads         = num_heads,
+                                         mlp_ratio         = mlp_ratio,
+                                         activation        = activation,
+                                         attention_dropout = attention_dropout,
+                                         dropout           = dropout,
+                                         norm_first        = norm_first,
+                                         flash_attention   = flash_attention,
+                                         qkv_bias          = qkv_bias,
+                                         use_rope          = use_rope,
+                                         rope_base         = rope_base,
+                                         mlp_hidden_dim    = mlp_hidden_dim,
+                                         layer_norm_eps    = layer_norm_eps,
+                                         drop_path         = drop_path)
+        
         super().__init__(resolved)
 
     def _build_causal_mask(self, x: Tensor, mask: Tensor, past_len: int = 0) -> Tensor:
+        
         batch_size, seq_len, _ = x.shape
         total_len = past_len + seq_len
+        
         causal = torch.tril(torch.ones(total_len, total_len, device=x.device, dtype=torch.bool))
+        
         if seq_len != total_len:
             causal = causal[total_len - seq_len : total_len, :]
         causal = causal.unsqueeze(0).expand(batch_size, seq_len, total_len)
 
         if mask.dtype != torch.bool:
             mask = mask > 0
+        
         if mask.dim() == 2:
             pad = mask[:, None, :].expand(batch_size, seq_len, mask.size(1))
             if mask.size(1) != total_len:
                 raise ValueError("Padding mask length does not match total sequence length.")
             return causal & pad
+        
         if mask.dim() == 3:
             return causal & mask
         raise ValueError("Unsupported attention mask rank.")
 
-    def forward(
-        self,
-        x: Tensor,
-        mask: Optional[Tensor] = None,
-        past_kv: Optional[tuple[Tensor, Tensor]] = None,
-        use_cache: bool = False,
-    ) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
+    def forward(self,
+                x         : Tensor,
+                mask      : Optional[Tensor] = None,
+                past_kv   : Optional[tuple[Tensor, Tensor]] = None,
+                use_cache : bool = False,
+            ) -> Tensor | tuple[Tensor, tuple[Tensor, Tensor]]:
+        
         past_len = 0 if past_kv is None else past_kv[0].size(2)
         attn_mask = None
         is_causal = False
@@ -261,10 +262,9 @@ class TransformerDecoderLayer(_TransformerLayerBase):
                 is_causal = True
             else:
                 attn_mask = self._build_causal_mask(x, mask, past_len=past_len)
-        return self._forward_block(
-            x,
-            mask=attn_mask,
-            past_kv=past_kv,
-            use_cache=use_cache,
-            is_causal=is_causal,
-        )
+
+        return self._forward_block(x,
+                                   mask      = attn_mask,
+                                   past_kv   = past_kv,
+                                   use_cache = use_cache,
+                                   is_causal = is_causal)
