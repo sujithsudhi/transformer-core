@@ -20,11 +20,16 @@ class AttributionResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        payload = {
-            "attribution": self.attribution,
-            "method": self.method,
-            "metadata": dict(self.metadata),
-        }
+        """
+        Convert the attribution result into a plain dictionary.
+        Args:
+            None.
+        Returns:
+            Dictionary containing the attribution tensors and metadata.
+        """
+        payload = {"attribution": self.attribution,
+                   "method"     : self.method,
+                   "metadata"   : dict(self.metadata)}
         if self.token_importance is not None:
             payload["token_importance"] = self.token_importance
         return payload
@@ -44,13 +49,18 @@ class AttentionTraceResult:
     v: Optional[list[Tensor]] = None
 
     def to_dict(self) -> dict[str, Any]:
-        payload = {
-            "attention_maps": self.attention_maps,
-            "layer_names": self.layer_names,
-            "num_layers": len(self.attention_maps),
-            "batch_size": self.batch_size,
-            "seq_len": self.seq_len,
-        }
+        """
+        Convert the attention trace into a plain dictionary.
+        Args:
+            None.
+        Returns:
+            Dictionary containing the attention trace tensors and metadata.
+        """
+        payload = {"attention_maps": self.attention_maps,
+                   "layer_names"   : self.layer_names,
+                   "num_layers"    : len(self.attention_maps),
+                   "batch_size"    : self.batch_size,
+                   "seq_len"       : self.seq_len}
         if self.num_heads is not None:
             payload["num_heads"] = self.num_heads
         if self.q is not None:
@@ -74,10 +84,15 @@ class VLMExplanationResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        payload = {
-            "layout": self.layout,
-            "metadata": dict(self.metadata),
-        }
+        """
+        Convert the multimodal explanation result into a plain dictionary.
+        Args:
+            None.
+        Returns:
+            Dictionary containing text-side, image-side, and metadata outputs.
+        """
+        payload = {"layout"  : self.layout,
+                   "metadata": dict(self.metadata)}
         if self.text_token_scores is not None:
             payload["text_token_scores"] = self.text_token_scores
         if self.image_patch_scores is not None:
@@ -99,12 +114,17 @@ class FaithfulnessResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "selected_positions": list(self.selected_positions),
-            "comprehensiveness": self.comprehensiveness,
-            "sufficiency": self.sufficiency,
-            "metadata": dict(self.metadata),
-        }
+        """
+        Convert the faithfulness result into a plain dictionary.
+        Args:
+            None.
+        Returns:
+            Dictionary containing selected positions, scores, and metadata.
+        """
+        return {"selected_positions": list(self.selected_positions),
+                "comprehensiveness": self.comprehensiveness,
+                "sufficiency"      : self.sufficiency,
+                "metadata"         : dict(self.metadata)}
 
 
 @dataclass
@@ -116,6 +136,13 @@ class VLMFaithfulnessResult:
     image: Optional[FaithfulnessResult] = None
 
     def to_dict(self) -> dict[str, Any]:
+        """
+        Convert the multimodal faithfulness result into a plain dictionary.
+        Args:
+            None.
+        Returns:
+            Dictionary containing overall and optional modality-specific scores.
+        """
         payload = {"overall": self.overall.to_dict()}
         if self.text is not None:
             payload["text"] = self.text.to_dict()

@@ -14,14 +14,31 @@ class TokenEmbedding(nn.Module):
     def __init__(self,
                  vocab_size  : int = 256,
                  embed_dim   : int = 256,
-                 padding_idx : int | None = None) -> None:
+                 padding_idx : int | None = None,
+             ) -> None:
+        """
+        Initialize a token embedding table.
+        Args:
+            vocab_size  : Number of discrete token ids supported by the table.
+            embed_dim   : Embedding dimension produced for each token.
+            padding_idx : Optional token id that should stay zeroed during training.
+        Returns:
+            None.
+        """
         super().__init__()
-        
+
         self.embedding = nn.Embedding(num_embeddings = vocab_size,
                                       embedding_dim  = embed_dim,
                                       padding_idx    = padding_idx)
 
     def forward(self, tokens: Tensor) -> Tensor:
+        """
+        Embed token ids into dense vectors.
+        Args:
+            tokens : Tensor of shape (batch_size, seq_len) containing token ids.
+        Returns:
+            Tensor of shape (batch_size, seq_len, embed_dim) containing embeddings.
+        """
         return self.embedding(tokens)
 
 
@@ -32,7 +49,20 @@ class PositionalEncoding(nn.Module):
                  max_len   : int,
                  embed_dim : int,
                  dropout   : float,
-                 method    : str = "normal") -> None:
+                 method    : str = "normal",
+             ) -> None:
+        """
+        Initialize a positional encoding table.
+        Args:
+            max_len   : Maximum supported sequence length.
+            embed_dim : Embedding dimension for each position vector.
+            dropout   : Dropout probability applied after adding the encoding.
+            method    : Encoding type, either ``"normal"`` or ``"trainable"``.
+        Returns:
+            None.
+        Raises:
+            ValueError: If max_len, embed_dim, or method is invalid.
+        """
         super().__init__()
 
         if max_len <= 0:
@@ -51,15 +81,27 @@ class PositionalEncoding(nn.Module):
             nn.init.trunc_normal_(self.positional_table, std=0.02)
         else:
             position = torch.arange(0, max_len, dtype=torch.float32).unsqueeze(1)
-            div_term = torch.exp(
-                torch.arange(0, embed_dim, 2, dtype=torch.float32) * (-math.log(10000.0) / embed_dim)
-            )
+            div_term = torch.exp(torch.arange(0, embed_dim, 2, dtype=torch.float32)
+                                 * (-math.log(10000.0) / embed_dim))
             pe       = torch.zeros(max_len, embed_dim, dtype=torch.float32)
             pe[:, 0::2] = torch.sin(position * div_term)
             pe[:, 1::2] = torch.cos(position * div_term[: pe[:, 1::2].shape[1]])
             self.register_buffer("positional_table", pe.unsqueeze(0), persistent=False)
 
-    def forward(self, x: Tensor, offset: int = 0) -> Tensor:
+    def forward(self,
+                x      : Tensor,
+                offset : int = 0,
+            ) -> Tensor:
+        """
+        Add positional encodings to an input sequence.
+        Args:
+            x      : Tensor of shape (batch_size, seq_len, embed_dim).
+            offset : Starting position offset used for cached decoding.
+        Returns:
+            Tensor of shape (batch_size, seq_len, embed_dim) after position addition.
+        Raises:
+            ValueError: If the requested position window exceeds max_len.
+        """
         length = x.size(1)
         if offset + length > self.max_len:
             raise ValueError(
